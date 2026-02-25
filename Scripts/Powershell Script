@@ -1,0 +1,257 @@
+<# 
+PHASE 2 BUILD SCRIPT (xxxxx.local)
+Creates:
+- OU=Corp tree (Users, Workstations, Servers, Admin, Groups)
+- Department sub OUs (HR, Finance, Engineering, Sales, IT)
+- Core security groups (RBAC, RDP, Local Admin control)
+- Optional: Redirect default Users and Computers containers into your Corp OUs
+- Optional: Create sample users from CSV
+
+Run on the Domain Controller as Administrator.
+
+Recommended usage:
+1) Run the script once with -CreateSampleCsv to generate a template CSV.
+2) Edit the CSV with your users.
+3) Run the script again with -ImportUsersCsvPath "C:\Phase2\users.csv"
+
+#>
+
+[CmdletBinding()]
+param(
+  [switch]$RedirectDefaultContainers = $true,
+  [switch]$CreateSampleCsv = $true,
+  [string]$ImportUsersCsvPath = "C:\Phase2\users.csv",
+  [string]$DefaultUserPassword = "ChangeMe!2026"
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+function Ensure-Module {
+  param([string]$Name)
+  if (-not (Get-Module -ListAvailable -Name $Name)) {
+    throw "Missing module: $Name. Install RSAT AD PowerShell feature on the DC."
+  }
+  Import-Module $Name -ErrorAction Stop
+}
+
+function Ensure-OU {
+  param(
+    [Parameter(Mandatory)] [string]$Name,
+    [Parameter(Mandatory)] [string]$Path,
+    [switch]$Protect = $true
+  )
+  $existing = Get-ADOrganizationalUnit -Filter "Name -eq '$Name'" -SearchBase $Path -ErrorAction SilentlyContinue
+  if (-not $existing) {
+    New-ADOrganizationalUnit -Name $Name -Path $Path -ProtectedFromAccidentalDeletion:$Protect | Out-Null
+    Write-Host "Created OU: $Name in $Path"
+  } else {
+    Write-Host "Exists OU:  $Name in $Path"
+  }
+}
+
+function Ensure-Group {
+  param(
+    [Parameter(Mandatory)] [string]$Name,
+    [Parameter(Mandatory)] [ValidateSet("Global","DomainLocal","Universal")] [string]$Scope,
+    [Parameter(Mandatory)] [ValidateSet("Security","Distribution")] [string]$Category,
+    [Parameter(Mandatory)] [string]$Path,
+    [string]$Description = ""
+  )
+
+  $existing = Get-ADGroup -Filter "Name -eq '$Name'" -ErrorAction SilentlyContinue
+  if (-not $existing) {
+    New-ADGroup -Name $Name -GroupScope $Scope -GroupCategory $Category -Path $Path -Description $Description | Out-Null
+    Write-Host "Created Group: $Name"
+  } else {
+    Write-Host "Exists Group:  $Name"
+  }
+}
+
+function Ensure-Folder {
+  param([Parameter(Mandatory)] [string]$Path)
+  if (-not (Test-Path $Path)) { New-Item -ItemType Directory -Path $Path | Out-Null }
+}
+
+Ensure-Module -Name ActiveDirectory
+
+$domain = Get-ADDomain
+$dnsRoot = $domain.DnsRoot
+$domainDN = $domain.DistinguishedName
+
+Write-Host "Domain: $dnsRoot"
+Write-Host "DN:     $domainDN"
+
+# Working directory
+$workDir = "C:\Phase2"
+Ensure-Folder -Path $workDir
+
+# OU paths
+$corpOU = "OU=Corp,$domainDN"
+
+# Create top OU=Corp
+Ensure-OU -Name "Corp" -Path $domainDN -Protect
+
+# Create second-level OUs under Corp
+$corpChildren = @("Users","Workstations","Servers","Admin","Groups")
+foreach ($ou in $corpChildren) { Ensure-OU -Name $ou -Path $corpOU -Protect }
+
+# Departments under Users and Workstations
+$departments = @("HR","Finance","Engineering","Sales","IT")
+$usersOU = "OU=Users,$corpOU"
+$wksOU   = "OU=Workstations,$corpOU"
+
+foreach ($d in $departments) {
+  Ensure-OU -Name $d -Path $usersOU -Protect
+  Ensure-OU -Name $d -Path $wksOU -Protect
+}
+
+# Servers sub OUs
+$serversOU = "OU=Servers,$corpOU"
+$serverSub = @("Member Servers","File Servers","App Servers","Management")
+foreach ($ou in $serverSub) { Ensure-OU -Name $ou -Path $serversOU -Protect }
+
+# Admin sub OUs
+$adminOU = "OU=Admin,$corpOU"
+$adminSub = @("Tier0","Tier1","Tier2","ServiceAccounts")
+foreach ($ou in $adminSub) { Ensure-OU -Name $ou -Path $adminOU -Protect }
+
+# Groups OU path
+$groupsOU = "OU=Groups,$corpOU"
+
+# Core groups
+# Global groups for people and roles
+Ensure-Group -Name "GG_HR_Users"          -Scope Global     -Category Security -Path $groupsOU -Description "HR department users"
+Ensure-Group -Name "GG_Finance_Users"     -Scope Global     -Category Security -Path $groupsOU -Description "Finance department users"
+Ensure-Group -Name "GG_Engineering_Users" -Scope Global     -Category Security -Path $groupsOU -Description "Engineering department users"
+Ensure-Group -Name "GG_Sales_Users"       -Scope Global     -Category Security -Path $groupsOU -Description "Sales department users"
+Ensure-Group -Name "GG_IT_Users"          -Scope Global     -Category Security -Path $groupsOU -Description "IT department users"
+
+Ensure-Group -Name "GG_IT_Helpdesk"       -Scope Global     -Category Security -Path $groupsOU -Description "Helpdesk operators"
+Ensure-Group -Name "GG_IT_ServerAdmins"   -Scope Global     -Category Security -Path $groupsOU -Description "Server administrators"
+
+# Domain Local groups for permissions and allow-lists
+Ensure-Group -Name "DL_RDP_Servers_Allowed"        -Scope DomainLocal -Category Security -Path $groupsOU -Description "Allowed to RDP into servers"
+Ensure-Group -Name "DL_RDP_Workstations_Allowed"   -Scope DomainLocal -Category Security -Path $groupsOU -Description "Allowed to RDP into workstations"
+Ensure-Group -Name "DL_LocalAdmin_Workstations"    -Scope DomainLocal -Category Security -Path $groupsOU -Description "Local Administrators on workstations"
+Ensure-Group -Name "DL_LocalAdmin_Servers"         -Scope DomainLocal -Category Security -Path $groupsOU -Description "Local Administrators on servers"
+
+# Optionally redirect default containers so new objects do not land in CN=Users and CN=Computers
+if ($RedirectDefaultContainers) {
+  $targetUsersOU     = $usersOU
+  $targetComputersOU = $wksOU
+
+  Write-Host "Redirecting default user and computer containers"
+  & redirusr $targetUsersOU | Out-Null
+  & redircmp $targetComputersOU | Out-Null
+  Write-Host "Default Users now go to:     $targetUsersOU"
+  Write-Host "Default Computers now go to: $targetComputersOU"
+} else {
+  Write-Host "Skipping redirusr and redircmp"
+}
+
+# Create a sample CSV template
+if ($CreateSampleCsv) {
+  $samplePath = Join-Path $workDir "users.sample.csv"
+  @"
+FirstName,LastName,Department,Title,CreateAdminAccount
+Jane,Doe,HR,HR Specialist,false
+Mark,Stone,Finance,Accountant,false
+Ava,Chen,Engineering,Systems Analyst,false
+Luis,Ramos,Sales,Account Executive,false
+Robert,Garcia,IT,IT Analyst,true
+"@ | Set-Content -Path $samplePath -Encoding UTF8
+
+  Write-Host "Created sample CSV at: $samplePath"
+  Write-Host "Copy it to users.csv and edit it, then rerun this script."
+}
+
+# Import users if CSV exists
+if (Test-Path $ImportUsersCsvPath) {
+  Write-Host "Importing users from: $ImportUsersCsvPath"
+
+  $pw = ConvertTo-SecureString $DefaultUserPassword -AsPlainText -Force
+  $rows = Import-Csv $ImportUsersCsvPath
+
+  foreach ($r in $rows) {
+    $fn = $r.FirstName.Trim()
+    $ln = $r.LastName.Trim()
+    $dept = $r.Department.Trim()
+    $title = $r.Title.Trim()
+    $createAdmin = $false
+    if ($r.PSObject.Properties.Name -contains "CreateAdminAccount") {
+      $createAdmin = ($r.CreateAdminAccount.ToString().ToLower() -eq "true")
+    }
+
+    if (-not $fn -or -not $ln -or -not $dept) { 
+      Write-Host "Skipping row with missing fields: $($r | ConvertTo-Json -Compress)"
+      continue
+    }
+
+    $sam = ("{0}.{1}" -f $fn, $ln).ToLower()
+    $upn = "$sam@$dnsRoot"
+    $userOUPath = "OU=$dept,$usersOU"
+
+    # Create standard user
+    if (-not (Get-ADUser -Filter "SamAccountName -eq '$sam'" -ErrorAction SilentlyContinue)) {
+      New-ADUser `
+        -Name "$fn $ln" `
+        -GivenName $fn `
+        -Surname $ln `
+        -SamAccountName $sam `
+        -UserPrincipalName $upn `
+        -Department $dept `
+        -Title $title `
+        -AccountPassword $pw `
+        -Enabled $true `
+        -ChangePasswordAtLogon $true `
+        -Path $userOUPath | Out-Null
+
+      Write-Host "Created user: $sam"
+    } else {
+      Write-Host "Exists user:  $sam"
+    }
+
+    # Add to department group
+    $deptGroup = "GG_${dept}_Users"
+    if (Get-ADGroup -Filter "Name -eq '$deptGroup'" -ErrorAction SilentlyContinue) {
+      Add-ADGroupMember -Identity $deptGroup -Members $sam -ErrorAction SilentlyContinue
+    }
+
+    # Create admin account if requested (only for IT users typically)
+    if ($createAdmin) {
+      $admSam = "$sam-adm"
+      $admUpn = "$admSam@$dnsRoot"
+      $tier2OU = "OU=Tier2,$adminOU"
+
+      if (-not (Get-ADUser -Filter "SamAccountName -eq '$admSam'" -ErrorAction SilentlyContinue)) {
+        New-ADUser `
+          -Name "$fn $ln (Admin)" `
+          -GivenName $fn `
+          -Surname $ln `
+          -SamAccountName $admSam `
+          -UserPrincipalName $admUpn `
+          -Department "IT" `
+          -Title "Admin Account" `
+          -AccountPassword $pw `
+          -Enabled $true `
+          -ChangePasswordAtLogon $true `
+          -Path $tier2OU | Out-Null
+
+        Write-Host "Created admin user: $admSam"
+      } else {
+        Write-Host "Exists admin user:  $admSam"
+      }
+
+      # Put admin in Helpdesk by default, adjust later
+      Add-ADGroupMember -Identity "GG_IT_Helpdesk" -Members $admSam -ErrorAction SilentlyContinue
+    }
+  }
+
+  Write-Host "User import complete."
+} else {
+  Write-Host "No users.csv found at: $ImportUsersCsvPath"
+  Write-Host "If you want bulk users, create it from the sample and rerun."
+}
+
+Write-Host "Phase 2 build complete."

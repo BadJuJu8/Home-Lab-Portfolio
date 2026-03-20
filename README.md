@@ -54,16 +54,16 @@ The lab is built on Proxmox and designed to simulate a small corporate environme
 |      60 | SecTools  | 10.60.0.0/24 | 10.60.0.1 | Security tools and monitoring systems |
 ## Project Phases
 
-- [00-Architecture](00-architecture)
-- [01-Proxmox Foundation, Initial Constraints, and Early Design Decision](01-Proxmox%20Foundation,%20Initial%20Constraints,%20and%20Early%20Design%20Decision)
-- [02-OPNsense Deployment and Early Network Foundation](02-OPNsense%20Deployment%20and%20Early%20Network%20Foundation)
-- [03-VLAN Design, Segmentation Strategy, and Internal Network Trust Boundaries](03-VLAN%20Design,%20Segmentation%20Strategy,%20and%20Internal%20Network%20Trust%20Boundaries)
-- [04-Active Directory and DNS Foundation in a Segmented Network](04-Active%20Directory%20and%20DNS%20Foundation%20in%20a%20Segmented%20Network)
-- [05-OU Structure, Department Design, User Provisioning, and Naming Standards](05-OU%20Structure,%20Department%20Design,%20User%20Provisioning,%20and%20Naming%20Standards)
-- [06-Group Policy Design, Baseline Security, and Centralized Endpoint Control](06-Group%20Policy%20Design,%20Baseline%20Security,%20and%20Centralized%20Endpoint%20Control)
-- [07-File Server Deployment, Department Shares, and Drive Mapping Through Group Policy](07-File%20Server%20Deployment,%20Department%20Shares,%20and%20Drive%20Mapping%20Through%20Group%20Policy)
-- [08-Linux Systems, Cross Platform Administration, and Early Trust Integration Challenges](08-Linux%20Systems,%20Cross%20Platform%20Administration,%20and%20Early%20Trust%20Integration%20Challenges)
-- [09-Splunk Deployment, Centralized Logging, and Early Detection Engineering](09-Splunk%20Deployment,%20Centralized%20Logging,%20and%20Early%20Detection%20Engineering)
+- 00-Architecture
+- 01-Proxmox Foundation, Initial Constraints, and Early Design Decision
+- 02-OPNsense Deployment and Early Network Foundation
+- 03-VLAN Design, Segmentation Strategy, and Internal Network Trust Boundaries
+- 04-Active Directory and DNS Foundation in a Segmented Network
+- 05-OU Structure, Department Design, User Provisioning, and Naming Standards
+- 06-Group Policy Design, Baseline Security, and Centralized Endpoint Control
+- 07-File Server Deployment, Department Shares, and Drive Mapping Through Group Policy
+- 08-Linux Systems, Cross Platform Administration, and Early Trust Integration Challenges
+- 09-Splunk Deployment, Centralized Logging, and Early Detection Engineering
 ## Lessons Learned
 
 - Infrastructure design is heavily shaped by hardware constraints

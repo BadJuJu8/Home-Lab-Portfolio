@@ -1,9 +1,7 @@
-# Obsidian local settings and cache
-.obsidian/workspace.json
-.obsidian/workspace-mobile.json
-.obsidian/cache/
-.trash/
+# Obsidian
+**/.obsidian/
 
 # OS junk
 Thumbs.db
 .DS_Store
+.trash/

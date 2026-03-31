@@ -48,10 +48,10 @@ The lab is built on Proxmox and designed to simulate a small corporate environme
 
 | VLAN ID | Name      | Subnet       | Gateway   | Purpose                               |
 | ------: | --------- | ------------ | --------- | ------------------------------------- |
-|      10 | Servers   | 10.10.0.0/24 | 10.10.0.1 | Domain controller, file server        |
-|      20 | Endpoints | 10.20.0.0/24 | 10.20.0.1 | User workstations                     |
-|      50 | NetAdmin  | 10.50.0.0/24 | 10.50.0.1 | Administrative workstation            |
-|      60 | SecTools  | 10.60.0.0/24 | 10.60.0.1 | Security tools and monitoring systems |
+|      10 | Servers   | 10.10.0.0/24 | 10.10.40.1 | Domain controller, file server        |
+|      20 | Endpoints | 10.20.0.0/24 | 10.20.40.1 | User workstations                     |
+|      50 | NetAdmin  | 10.50.0.0/24 | 10.50.40.1 | Administrative workstation            |
+|      60 | SecTools  | 10.60.0.0/24 | 10.60.40.1 | Security tools and monitoring systems |
 ## Project Phases
 
 - 00-Architecture

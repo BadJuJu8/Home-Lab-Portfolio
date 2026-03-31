@@ -15,10 +15,10 @@ Instead of adding VLANs randomly over time, I created the major network segments
 
 |VLAN ID|Name|Subnet|Gateway|Purpose|
 |---|---|---|---|---|
-|10|Servers|10.10.0.0/24|10.10.0.1|Domain controller, file server, and infrastructure systems|
-|20|Endpoints|10.20.0.0/24|10.20.0.1|User workstations|
-|50|NetAdmin|10.50.0.0/24|10.50.0.1|Administrative workstation|
-|60|SecTools|10.60.0.0/24|10.60.0.1|Security tools and monitoring systems|
+|10|Servers|10.10.0.0/24|10.10.40.1|Domain controller, file server, and infrastructure systems|
+|20|Endpoints|10.20.0.0/24|10.20.40.1|User workstations|
+|50|NetAdmin|10.50.0.0/24|10.50.40.1|Administrative workstation|
+|60|SecTools|10.60.0.0/24|10.60.40.1|Security tools and monitoring systems|
 
 This design created clearer internal trust boundaries. Infrastructure systems lived in the server network, user systems were isolated in the endpoint network, administration had its own segment, and security tools were placed separately so they could later support monitoring without living in the same trust zone as everything else.
 
